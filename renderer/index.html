@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Screen Translator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="window-frame">
+    <!-- Header -->
+    <header class="window-header">
+      <div class="header-brand">
+        <div class="brand-icon">ST</div>
+        <div class="brand-title">Screen Translator</div>
+      </div>
+
+      <div class="header-controls">
+        <button id="btn-header-snip" class="btn-primary" title="Capture another region (Ctrl+Shift+S)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="16"></line>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          <span>Snip</span>
+        </button>
+
+        <button id="btn-save-all" class="btn-icon" title="Save screenshot & text">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+        </button>
+
+        <button id="btn-close" class="btn-icon btn-close" title="Close window">
+          ✕
+        </button>
+      </div>
+    </header>
+
+    <!-- Language Toolbar -->
+    <div class="lang-toolbar">
+      <div class="lang-selectors">
+        <select id="source-lang">
+          <option value="en" selected>English</option>
+          <option value="vi">Vietnamese</option>
+          <option value="auto">Auto-detect</option>
+        </select>
+
+        <button id="btn-swap-lang" class="btn-icon" title="Swap languages">
+          ⇄
+        </button>
+
+        <select id="target-lang">
+          <option value="vi" selected>Vietnamese</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <button id="btn-translate" class="btn-primary">
+        Translate
+      </button>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="window-content">
+      <!-- Original Text Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <span>Original Text (OCR)</span>
+          <div class="section-actions">
+            <button id="btn-retry-ocr" class="btn-icon" title="Retry OCR on captured image">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </button>
+            <button id="btn-copy-orig" class="btn-icon" title="Copy original text">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+            <button id="btn-save-orig-txt" class="btn-icon" title="Save original text to .txt">
+              <span>Save</span>
+            </button>
+          </div>
+        </div>
+        <textarea id="text-orig" class="text-area" placeholder="Captured text will appear here..."></textarea>
+      </div>
+
+      <!-- Translation Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <span>Translation</span>
+          <div class="section-actions">
+            <button id="btn-copy-trans" class="btn-icon" title="Copy translation">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+            <button id="btn-save-trans-txt" class="btn-icon" title="Save translation to .txt">
+              <span>Save</span>
+            </button>
+          </div>
+        </div>
+        <textarea id="text-trans" class="text-area" placeholder="Translated text will appear here..."></textarea>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="window-footer">
+      <div class="status-box">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Ready</span>
+      </div>
+      <div id="status-shortcut" style="font-size: 11px;">Ctrl + Shift + S</div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast">Notification</div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

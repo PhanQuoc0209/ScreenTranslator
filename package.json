@@ -1,0 +1,25 @@
+{
+  "name": "screen-translator",
+  "version": "1.0.0",
+  "description": "Lightweight Windows desktop application for screen text extraction and translation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "electron",
+    "ocr",
+    "screen-translator",
+    "translation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^45.2.3"
+  },
+  "dependencies": {
+    "tesseract.js": "^7.0.0"
+  }
+}
