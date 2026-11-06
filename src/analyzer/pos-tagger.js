@@ -72,7 +72,22 @@ const INTERJECTIONS = new Set([
 ]);
 
 const COMMON_PARTICIPIAL_ADJECTIVES = new Set([
-  'interesting', 'boring', 'exciting', 'surprising', 'charming', 'amazing', 'confusing', 'tiring', 'frightening'
+  'interesting', 'boring', 'exciting', 'surprising', 'charming', 'amazing', 'confusing', 'tiring', 'frightening',
+  'tired', 'bored', 'interested', 'excited', 'confused', 'pleased', 'worried', 'crowded', 'disappointed'
+]);
+
+const IRREGULAR_PAST_PARTICIPLES = new Set([
+  'arisen', 'awoken', 'been', 'borne', 'beaten', 'begun', 'bent', 'bet', 'bitten', 'bled', 'blown',
+  'bought', 'bound', 'broken', 'bred', 'brought', 'built', 'burnt', 'burst', 'caught', 'chosen',
+  'clung', 'come', 'cost', 'crept', 'cut', 'dealt', 'dug', 'done', 'drawn', 'dreamt', 'driven',
+  'drunk', 'eaten', 'fallen', 'fed', 'felt', 'fought', 'found', 'fled', 'flung', 'flown', 'forbidden',
+  'forgotten', 'forgiven', 'frozen', 'got', 'gotten', 'given', 'gone', 'ground', 'grown', 'hung',
+  'heard', 'hidden', 'hit', 'held', 'hurt', 'kept', 'known', 'laid', 'led', 'left', 'lent', 'let',
+  'lain', 'lost', 'made', 'meant', 'met', 'paid', 'put', 'read', 'ridden', 'rung', 'risen', 'run',
+  'said', 'seen', 'sought', 'sold', 'sent', 'set', 'sewn', 'shaken', 'shone', 'shot', 'shown', 'shrunk',
+  'shut', 'sung', 'sunk', 'sat', 'slept', 'slid', 'spoken', 'spent', 'spun', 'split', 'spread', 'sprung',
+  'stood', 'stolen', 'stuck', 'stung', 'struck', 'sworn', 'swept', 'swum', 'swung', 'taken', 'taught',
+  'torn', 'told', 'thought', 'thrown', 'understood', 'woken', 'worn', 'won', 'wound', 'written'
 ]);
 
 /**
@@ -357,12 +372,17 @@ function tagSentence(tokens) {
         ambiguous = false;
         confidence = 'high';
       } else if (AUX_BE.has(auxWord)) {
-        if ((clean.endsWith('ing') || clean.endsWith('ed') || candidates.has('VERB')) && candidates.has('VERB')) {
+        const isParticipleVerb = (clean.endsWith('ing') || clean.endsWith('ed') || IRREGULAR_PAST_PARTICIPLES.has(clean)) && !COMMON_PARTICIPIAL_ADJECTIVES.has(clean);
+        if (isParticipleVerb && candidates.has('VERB')) {
           pos = 'VERB';
           ambiguous = false;
           confidence = 'high';
         } else if (candidates.has('ADJECTIVE')) {
           pos = 'ADJECTIVE';
+          ambiguous = false;
+          confidence = 'high';
+        } else if (candidates.has('VERB')) {
+          pos = 'VERB';
           ambiguous = false;
           confidence = 'high';
         }
@@ -451,12 +471,26 @@ function tagSentence(tokens) {
       }
     }
 
+    let finalLemma = clean;
+    if (lemmaRes && Array.isArray(lemmaRes.lemmas) && lemmaRes.lemmas.length > 0) {
+      if (lemmaRes.lemmas.length > 1 && pos) {
+        const refinedLemmaRes = lemmatizeWord(clean, { pos });
+        if (refinedLemmaRes && refinedLemmaRes.lemmas && refinedLemmaRes.lemmas.length > 0) {
+          finalLemma = refinedLemmaRes.lemmas[0];
+        } else {
+          finalLemma = lemmaRes.lemmas[0];
+        }
+      } else {
+        finalLemma = lemmaRes.lemmas[0];
+      }
+    }
+
     tagged.push({
       ...tok,
       pos,
       posCandidates: Array.from(candidates),
       ambiguous,
-      lemma: (lemmaRes.lemmas && lemmaRes.lemmas[0]) || clean,
+      lemma: finalLemma,
       confidence
     });
   }

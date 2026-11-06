@@ -235,6 +235,19 @@ function analyzeVerbPhrases(sentenceText, taggedTokens) {
 
           if (nextTok.pos === 'AUXILIARY') {
             const stem = (nextTok.contraction && nextTok.contraction.stem) || nextTok.cleanWord;
+            // If we already have a modal or auxiliary, and nextTok is do/did/done/does,
+            // it functions as the lexical main verb (e.g. "should not do", "have done"), not an auxiliary!
+            if ((isModal || auxNames.length > 0) && (stem === 'do' || stem === 'did' || stem === 'done' || stem === 'does')) {
+              headToken = {
+                ...nextTok,
+                pos: 'VERB',
+                lemma: 'do'
+              };
+              clusterTokens.push(nextTok);
+              lastToken = nextTok;
+              curr++;
+              break;
+            }
             auxNames.push(stem);
             clusterTokens.push(nextTok);
             lastToken = nextTok;
@@ -296,12 +309,12 @@ function analyzeVerbPhrases(sentenceText, taggedTokens) {
         }
       }
 
-      // Determine voice: passive if be + past_participle
+      // Determine voice: passive if be + separate lexical past_participle (be itself cannot be passive)
       const hasAuxBe = auxNames.some(a => AUX_BE.has(a));
       const hasAuxHave = auxNames.some(a => AUX_HAVE.has(a));
       const headForm = getVerbForm(headToken, hasAuxHave, hasAuxBe);
 
-      const isPassive = hasAuxBe && (headForm === 'past_participle' || (headToken.pos === 'VERB' && (headToken.cleanWord.endsWith('ed') || (IRREGULAR_FORMS[headToken.cleanWord] && IRREGULAR_FORMS[headToken.cleanWord].some(x => x.category === 'past_participle')))));
+      const isPassive = hasAuxBe && !AUX_BE.has(headToken.cleanWord) && (headForm === 'past_participle' || (headToken.pos === 'VERB' && (headToken.cleanWord.endsWith('ed') || (IRREGULAR_FORMS[headToken.cleanWord] && IRREGULAR_FORMS[headToken.cleanWord].some(x => x.category === 'past_participle')))));
 
       // Determine aspect
       let aspect = 'simple';

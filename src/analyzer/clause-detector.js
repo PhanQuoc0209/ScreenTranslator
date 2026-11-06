@@ -217,8 +217,9 @@ function detectClauses(sentenceText, taggedTokens) {
       ];
     }
 
-    // Coordinated clause with FANBOYS: ", and", ", but", etc.
-    if (COORDINATING.has(clean) && (taggedTokens[i - 1].text === ',' || (i > 1 && taggedTokens[i + 1] && (taggedTokens[i + 1].pos === 'PRONOUN' || taggedTokens[i + 1].pos === 'NOUN' || taggedTokens[i + 1].pos === 'DETERMINER')))) {
+    // Coordinated clause with FANBOYS: ", and", ", but", etc. (Must have a finite verb in the coordinated clause)
+    const hasVerbAfterCoordinator = taggedTokens.slice(i + 1).some(t => t.pos === 'VERB' || t.pos === 'AUXILIARY' || t.pos === 'MODAL');
+    if (COORDINATING.has(clean) && hasVerbAfterCoordinator && (taggedTokens[i - 1].text === ',' || (i > 1 && taggedTokens[i + 1] && (taggedTokens[i + 1].pos === 'PRONOUN' || taggedTokens[i + 1].pos === 'NOUN' || taggedTokens[i + 1].pos === 'DETERMINER')))) {
       const c1End = (taggedTokens[i - 1].text === ',') ? taggedTokens[i - 1].startIndex : tok.startIndex;
       const c2Start = tok.startIndex;
       const c2End = taggedTokens[len - 1].endIndex;

@@ -200,6 +200,18 @@ async function runTests() {
   assert.strictEqual(t4.translatedText, 'Thiết bị xyz123 đã bị hỏng.');
   assert.ok(t4.diagnostics.unknownWords.includes('xyz123'));
 
+  const t5 = translateSentence('She has finished her homework.');
+  assert.strictEqual(t5.translatedText, 'Cô ấy đã hoàn thành bài tập về nhà.');
+
+  const t6 = translateSentence('She looks tired.');
+  assert.strictEqual(t6.translatedText, 'Cô ấy trông mệt mỏi.');
+
+  const t7 = translateSentence('It is raining cats and dogs.');
+  assert.strictEqual(t7.translatedText, 'Trời đang mưa như trút nước.');
+
+  const t8 = translateSentence('He was punished.');
+  assert.strictEqual(t8.translatedText, 'Anh ấy đã bị phạt.');
+
   const multiTrans = translateOfflineText('She reads books. The sun shines.');
   assert.strictEqual(multiTrans.length, 2);
   assert.strictEqual(multiTrans[0].translatedText, 'Cô ấy đọc sách.');

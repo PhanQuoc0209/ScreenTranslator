@@ -44,7 +44,9 @@ const PRONOUNS_MAP = {
   'everybody': 'mọi người',
   'everything': 'mọi thứ',
   'nobody': 'không ai',
-  'nothing': 'không có gì'
+  'nothing': 'không có gì',
+  'that': 'điều đó',
+  'this': 'điều này'
 };
 
 const POSSESSIVES_MAP = {
@@ -239,12 +241,40 @@ const CORE_LEXICON_PREFERENCES = {
   'rain': { pos: 'VERB', gloss: 'mưa' },
   'stay': { pos: 'VERB', gloss: 'ở' },
   'pass': { pos: 'VERB', gloss: 'vượt qua' },
+  'take': { pos: 'VERB', gloss: 'lấy' },
   'call': { pos: 'VERB', gloss: 'gọi' },
   'give': { pos: 'VERB', gloss: 'cho' },
   'send': { pos: 'VERB', gloss: 'gửi' },
   'email': { pos: 'NOUN', gloss: 'thư điện tử' },
   'see': { pos: 'VERB', gloss: 'thấy' },
-  'understand': { pos: 'VERB', gloss: 'hiểu' }
+  'understand': { pos: 'VERB', gloss: 'hiểu' },
+  'family': { pos: 'NOUN', gloss: 'gia đình' },
+  'phone': { pos: 'NOUN', gloss: 'điện thoại' },
+  'room': { pos: 'NOUN', gloss: 'phòng' },
+  'parents': { pos: 'NOUN', gloss: 'cha mẹ' },
+  'parent': { pos: 'NOUN', gloss: 'cha mẹ' },
+  'document': { pos: 'NOUN', gloss: 'tài liệu' },
+  'documents': { pos: 'NOUN', gloss: 'tài liệu' },
+  'window': { pos: 'NOUN', gloss: 'cửa sổ' },
+  'truth': { pos: 'NOUN', gloss: 'sự thật' },
+  'idea': { pos: 'NOUN', gloss: 'ý tưởng' },
+  'coffee': { pos: 'NOUN', gloss: 'cà phê' },
+  'door': { pos: 'NOUN', gloss: 'cửa' },
+  'tired': { pos: 'ADJECTIVE', gloss: 'mệt mỏi' },
+  'angry': { pos: 'ADJECTIVE', gloss: 'tức giận' },
+  'busy': { pos: 'ADJECTIVE', gloss: 'bận' },
+  'cute': { pos: 'ADJECTIVE', gloss: 'dễ thương' },
+  'punish': { pos: 'VERB', gloss: 'phạt' },
+  'approve': { pos: 'VERB', gloss: 'phê duyệt' },
+  'like': { pos: 'VERB', gloss: 'thích' },
+  'continue': { pos: 'VERB', gloss: 'tiếp tục' },
+  'leave': { pos: 'VERB', gloss: 'rời đi' },
+  'lose': { pos: 'VERB', gloss: 'mất' },
+  'lost': { pos: 'VERB', gloss: 'mất' },
+  'clean': { pos: 'VERB', gloss: 'dọn dẹp' },
+  'cleaned': { pos: 'VERB', gloss: 'dọn dẹp' },
+  'continued': { pos: 'VERB', gloss: 'tiếp tục' },
+  'working': { pos: 'NOUN', gloss: 'làm việc' }
 };
 
 /**
@@ -489,17 +519,25 @@ function translateWord(token, options = {}) {
     'PRONOUN': new Set(['P', 'PRON', 'p'])
   };
 
+  const isDefCrossReference = (def) => {
+    if (!def || typeof def !== 'string') return false;
+    return /(?:quá khứ|phân từ|dạng số nhiều|cách viết khác|chia ở ngôi|thời quá khứ).*(?:của|\/)\s*[a-z]+/i.test(def) ||
+           /^(?:động từ chia ở|dạng quá khứ|quá khứ|dạng phân từ|phân từ|hiện tại phân từ|danh từ số nhiều|dạng số nhiều|cách viết khác|thời quá khứ)/i.test(def);
+  };
+
   const isCrossReference = (d) => {
     if (!d || !d.found || !d.meanings || d.meanings.length === 0) return true;
-    const def = d.meanings[0].definition || '';
-    return /^(?:động từ chia ở|dạng quá khứ|quá khứ của|dạng phân từ|phân từ của|phân từ hai của|hiện tại phân từ|danh từ số nhiều|dạng số nhiều|cách viết khác của)/i.test(def);
+    return d.meanings.every(m => isDefCrossReference(m.definition || ''));
   };
 
   const hasMatchingPos = (d, targetPos) => {
     if (!d || !d.found || !d.meanings) return false;
     const targetSet = posFilter[targetPos];
     if (!targetSet) return true;
-    return d.meanings.some(m => targetSet.has((m.pos || '').toUpperCase()) || targetSet.has((m.posLabel || '').toLowerCase()));
+    return d.meanings.some(m =>
+      (targetSet.has((m.pos || '').toUpperCase()) || targetSet.has((m.posLabel || '').toLowerCase())) &&
+      !isDefCrossReference(m.definition || '')
+    );
   };
 
   let dict = searchDictionary(clean);
@@ -508,13 +546,13 @@ function translateWord(token, options = {}) {
   // If surface lookup is cross-reference or has no matching POS, use lemma
   if ((!dict.found || isCrossReference(dict) || (pos !== 'UNKNOWN' && !hasMatchingPos(dict, pos))) && lemma && lemma !== clean) {
     const lemmaDict = searchDictionary(lemma);
-    if (lemmaDict.found && (hasMatchingPos(lemmaDict, pos) || !dict.found)) {
+    if (lemmaDict.found && (hasMatchingPos(lemmaDict, pos) || !dict.found || isCrossReference(dict))) {
       dict = lemmaDict;
       effectiveLemma = lemma;
     }
   }
 
-  if (!dict.found) {
+  if (!dict.found || isCrossReference(dict)) {
     // Try lemmatizing with Stage 4 lemmatizer if not already done
     const lemRes = lemmatizeWord(clean);
     if (lemRes.lemmas && lemRes.lemmas.length > 0) {
@@ -529,16 +567,39 @@ function translateWord(token, options = {}) {
     }
   }
 
+  // If dictionary meaning for target POS is a cross-reference containing "của <word>", extract target lemma
+  if (dict.found && dict.meanings.length > 0) {
+    const targetPosSet = posFilter[pos];
+    const xrefMeaning = dict.meanings.find(m =>
+      (!targetPosSet || targetPosSet.has((m.pos || '').toUpperCase()) || targetPosSet.has((m.posLabel || '').toLowerCase())) &&
+      isDefCrossReference(m.definition || '')
+    );
+    if (xrefMeaning) {
+      const matchLemma = xrefMeaning.definition.match(/của\s+([a-z]+)/i);
+      if (matchLemma && matchLemma[1]) {
+        const extractedLemma = matchLemma[1].toLowerCase().trim();
+        const lemmaDict = searchDictionary(extractedLemma);
+        if (lemmaDict.found && (hasMatchingPos(lemmaDict, pos) || !targetPosSet)) {
+          dict = lemmaDict;
+          effectiveLemma = extractedLemma;
+        }
+      }
+    }
+  }
+
   if (dict.found && dict.meanings.length > 0) {
     const targetPosSet = posFilter[pos];
     let matchedMeaning = null;
 
     if (targetPosSet) {
-      matchedMeaning = dict.meanings.find(m => targetPosSet.has((m.pos || '').toUpperCase()) || targetPosSet.has((m.posLabel || '').toLowerCase()));
+      matchedMeaning = dict.meanings.find(m =>
+        (targetPosSet.has((m.pos || '').toUpperCase()) || targetPosSet.has((m.posLabel || '').toLowerCase())) &&
+        !isDefCrossReference(m.definition || '')
+      );
     }
 
     if (!matchedMeaning) {
-      matchedMeaning = dict.meanings[0];
+      matchedMeaning = dict.meanings.find(m => !isDefCrossReference(m.definition || '')) || dict.meanings[0];
     }
 
     const cleanGloss = extractCleanGloss(matchedMeaning.definition);

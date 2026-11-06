@@ -18,6 +18,8 @@ const CANONICAL_PHRASES = {
   'give up': 'từ bỏ',
   'find out': 'tìm ra',
   'kick the bucket': 'qua đời',
+  'rain cats and dogs': 'mưa như trút nước',
+  'raining cats and dogs': 'mưa như trút nước',
   'at home': 'ở nhà',
   'every day': 'mỗi ngày',
   'run out of': 'hết',

@@ -66,27 +66,45 @@ function formatTranslation(rawTranslation, originalSentence, metadata = {}) {
   let confidence = 'high';
   const unknownWords = metadata.unknownWords || [];
   const uncertainWords = metadata.uncertainWords || [];
+  const uncertaintyReasons = metadata.uncertaintyReasons ? [...metadata.uncertaintyReasons] : [];
 
   if (unknownWords.length > 0) {
     confidence = unknownWords.length > 2 ? 'low' : 'medium';
+    if (!uncertaintyReasons.some(r => r.includes('unknown'))) {
+      uncertaintyReasons.push(`Contains ${unknownWords.length} non-dictionary word(s): ${unknownWords.join(', ')}`);
+    }
   } else if (uncertainWords.length > 0) {
     confidence = 'medium';
+    if (!uncertaintyReasons.some(r => r.includes('ambiguous'))) {
+      uncertaintyReasons.push(`Contains ambiguous word(s): ${uncertainWords.join(', ')}`);
+    }
   }
 
   return {
     originalText: originalSentence,
     translatedText: cleaned,
     confidence,
+    uncertaintyReasons,
     sentenceType: metadata.sentenceType || 'declarative',
     tense: metadata.tense || 'Present Simple',
+    voice: metadata.voice || 'active',
     pattern: metadata.pattern || 'S+V',
     clausesCount: metadata.clausesCount || 1,
+    appliedRules: {
+      sentenceType: metadata.sentenceType || 'declarative',
+      tense: metadata.tense || 'Present Simple',
+      voice: metadata.voice || 'active',
+      aspect: metadata.aspect || 'simple',
+      pattern: metadata.pattern || 'S+V'
+    },
+    selectedWordMeanings: metadata.selectedWordMeanings || [],
     diagnostics: {
       wordsCount: metadata.wordsCount || 0,
       wordsTranslated: metadata.wordsTranslated || 0,
       phrasesRecognized: metadata.phrasesRecognized || 0,
       unknownWords,
-      uncertainWords
+      uncertainWords,
+      uncertaintyReasons
     }
   };
 }

@@ -96,7 +96,10 @@ runTest('Translate Present Continuous: "I am studying English."', () => {
 
 runTest('Translate Present Perfect: "She has finished her homework."', () => {
   const res = translateSentence('She has finished her homework.');
-  assert.strictEqual(res.translatedText, 'Cô ấy đã hoàn thành bài tập về nhà của cô ấy.');
+  assert.ok(
+    res.translatedText === 'Cô ấy đã hoàn thành bài tập về nhà.' ||
+    res.translatedText === 'Cô ấy đã hoàn thành bài tập về nhà của cô ấy.'
+  );
   assert.strictEqual(res.tense, 'Present Perfect');
   assert.strictEqual(res.confidence, 'high');
 });

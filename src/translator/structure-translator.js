@@ -17,9 +17,10 @@ const { translateVerbPhrase } = require('./tense-translator');
  * Extract trailing prepositional phrases, time adverbs, or other modifiers not part of core DO/IO.
  * @param {Array<Object>} tokens All tokens
  * @param {number} afterCoreIndex Index after the verb or core objects
+ * @param {Object} [options]
  * @returns {string} Translated trailing modifier string
  */
-function translateTrailingModifiers(tokens, afterCoreIndex) {
+function translateTrailingModifiers(tokens, afterCoreIndex, options = {}) {
   if (!tokens || afterCoreIndex >= tokens.length) return '';
 
   const trailingTokens = tokens.slice(afterCoreIndex).filter(t => t.pos !== 'PUNCTUATION');
@@ -27,11 +28,11 @@ function translateTrailingModifiers(tokens, afterCoreIndex) {
 
   // Check if starts with preposition
   if (trailingTokens[0].pos === 'PREPOSITION') {
-    return translatePrepositionalPhrase(trailingTokens);
+    return translatePrepositionalPhrase(trailingTokens, options);
   }
 
   // Check if time expression e.g. "every day", "tomorrow", "yesterday"
-  return trailingTokens.map(t => translateWord(t).translated).join(' ').trim();
+  return trailingTokens.map(t => translateWord(t, options).translated).join(' ').trim();
 }
 
 /**
@@ -82,16 +83,17 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       // WH-Question: e.g. "Where are you going?" -> "Bạn đang đi đâu?"
       const subjTokens = (syntax.subject && syntax.subject.tokens) || [{ cleanWord: 'you', text: 'you', pos: 'PRONOUN' }];
       const subjStr = translateNounPhrase(subjTokens);
-      const vpRes = translateVerbPhrase(verbPhrase, tenseInfo);
+      const vpRes = translateVerbPhrase(verbPhrase, tenseInfo, { tokens });
 
       let objStr = '';
       if (syntax.directObject) {
         const doTokens = syntax.directObject.tokens || (tokens ? tokens.filter(t => t.startIndex >= syntax.directObject.startIndex && t.endIndex <= syntax.directObject.endIndex) : []);
-        objStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'NOUN' }]);
+        objStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'NOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
       }
 
       if (firstWord === 'why') {
-        return `tại sao ${subjStr} ${vpRes.translated} ${objStr}`.replace(/\s+/g, ' ').trim();
+        const cleanVp = vpRes.translated.replace(/^đã\s+/, '');
+        return `tại sao ${subjStr} ${cleanVp} ${objStr}`.replace(/\s+/g, ' ').trim();
       }
 
       // Default WH placement: Subject + VP + [Object] + WH particle
@@ -101,12 +103,12 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       // Yes/No Question: e.g. "Did you see him?" -> "Bạn có thấy anh ấy không?"
       const subjTokens = (syntax.subject && syntax.subject.tokens) || [{ cleanWord: 'you', text: 'you', pos: 'PRONOUN' }];
       const subjStr = translateNounPhrase(subjTokens);
-      const vpRes = translateVerbPhrase(verbPhrase, tenseInfo);
+      const vpRes = translateVerbPhrase(verbPhrase, tenseInfo, { tokens });
 
       let objStr = '';
       if (syntax.directObject) {
         const doTokens = syntax.directObject.tokens || (tokens ? tokens.filter(t => t.startIndex >= syntax.directObject.startIndex && t.endIndex <= syntax.directObject.endIndex) : []);
-        objStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'PRONOUN' }]);
+        objStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'PRONOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
       }
 
       const verbCore = vpRes.verbGloss || vpRes.translated;
@@ -126,7 +128,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
   // B. Verb Phrase
   const isLinkingNoun = Boolean(syntax.subjectComplement && syntax.subjectComplement.type === 'noun');
   const isLinkingAdj = Boolean(syntax.subjectComplement && syntax.subjectComplement.type === 'adjective');
-  const vpRes = translateVerbPhrase(verbPhrase, tenseInfo, { isLinkingNoun, isLinkingAdj });
+  const vpRes = translateVerbPhrase(verbPhrase, tenseInfo, { isLinkingNoun, isLinkingAdj, tokens });
 
   // C. Find index after verb & core components to capture trailing modifiers
   let lastCoreIndex = 0;
@@ -141,7 +143,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
     let doStr = '';
     if (syntax.directObject) {
       const doTokens = syntax.directObject.tokens || (tokens ? tokens.filter(t => t.startIndex >= syntax.directObject.startIndex && t.endIndex <= syntax.directObject.endIndex) : []);
-      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'NOUN' }]);
+      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.head?.cleanWord || syntax.directObject.text, pos: 'NOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
 
       // Advance lastCoreIndex past direct object
       if (tokens) {
@@ -150,7 +152,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       }
     }
 
-    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex);
+    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex, { isObjectOrComplement: true, subject: syntax.subject });
 
     // E.g. "I will call you tomorrow" -> "Tôi sẽ gọi bạn vào ngày mai" / "Tôi sẽ gọi cho bạn ngày mai"
     const verbPreposition = (verbPhrase?.headVerb?.lemma === 'call' && doStr) ? 'cho' : '';
@@ -167,7 +169,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
         scStr = translateWord(scTok, { pos: 'ADJECTIVE' }).translated;
       } else {
         const scTokens = tokens ? tokens.filter(t => t.startIndex >= syntax.subjectComplement.startIndex && t.endIndex <= syntax.subjectComplement.endIndex) : [];
-        scStr = translateNounPhrase(scTokens.length > 0 ? scTokens : [{ text: syntax.subjectComplement.text, cleanWord: syntax.subjectComplement.text, pos: 'NOUN' }]);
+        scStr = translateNounPhrase(scTokens.length > 0 ? scTokens : [{ text: syntax.subjectComplement.text, cleanWord: syntax.subjectComplement.text, pos: 'NOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
       }
 
       if (tokens) {
@@ -176,26 +178,24 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       }
     }
 
-    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex);
+    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex, { isObjectOrComplement: true, subject: syntax.subject });
     const parts = [subjStr, vpRes.translated, scStr, trailingStr].filter(Boolean);
     return parts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
   if (pattern === 'S+V+IO+DO') {
     // S + V + Indirect Object + Direct Object
-    // English: "She gave him a book."
-    // Vietnamese: "Cô ấy đã cho anh ấy một quyển sách."
     let ioStr = '';
     let doStr = '';
 
     if (syntax.indirectObject) {
       const ioTokens = tokens ? tokens.filter(t => t.startIndex >= syntax.indirectObject.startIndex && t.endIndex <= syntax.indirectObject.endIndex) : [];
-      ioStr = translateNounPhrase(ioTokens.length > 0 ? ioTokens : [{ text: syntax.indirectObject.text, cleanWord: syntax.indirectObject.text, pos: 'PRONOUN' }]);
+      ioStr = translateNounPhrase(ioTokens.length > 0 ? ioTokens : [{ text: syntax.indirectObject.text, cleanWord: syntax.indirectObject.text, pos: 'PRONOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
     }
 
     if (syntax.directObject) {
       const doTokens = tokens ? tokens.filter(t => t.startIndex >= syntax.directObject.startIndex && t.endIndex <= syntax.directObject.endIndex) : [];
-      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.text, pos: 'NOUN' }]);
+      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.text, pos: 'NOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
 
       if (tokens) {
         const afterDo = tokens.findIndex(t => t.startIndex >= syntax.directObject.endIndex && t.pos !== 'PUNCTUATION');
@@ -203,21 +203,19 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       }
     }
 
-    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex);
+    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex, { isObjectOrComplement: true, subject: syntax.subject });
     const parts = [subjStr, vpRes.translated, ioStr, doStr, trailingStr].filter(Boolean);
     return parts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
   if (pattern === 'S+V+O+C') {
     // S + V + Direct Object + Object Complement
-    // e.g. "They made him happy." -> "Họ đã làm cho anh ấy hạnh phúc."
-    // e.g. "They made him president." -> "Họ đã bầu anh ấy làm chủ tịch."
     let doStr = '';
     let ocStr = '';
 
     if (syntax.directObject) {
       const doTokens = tokens ? tokens.filter(t => t.startIndex >= syntax.directObject.startIndex && t.endIndex <= syntax.directObject.endIndex) : [];
-      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.text, pos: 'PRONOUN' }]);
+      doStr = translateNounPhrase(doTokens.length > 0 ? doTokens : [{ text: syntax.directObject.text, cleanWord: syntax.directObject.text, pos: 'PRONOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
     }
 
     if (syntax.objectComplement) {
@@ -226,7 +224,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
         ocStr = translateWord(ocTok, { pos: 'ADJECTIVE' }).translated;
       } else {
         const ocTokens = tokens ? tokens.filter(t => t.startIndex >= syntax.objectComplement.startIndex && t.endIndex <= syntax.objectComplement.endIndex) : [];
-        ocStr = translateNounPhrase(ocTokens.length > 0 ? ocTokens : [{ text: syntax.objectComplement.text, cleanWord: syntax.objectComplement.text, pos: 'NOUN' }]);
+        ocStr = translateNounPhrase(ocTokens.length > 0 ? ocTokens : [{ text: syntax.objectComplement.text, cleanWord: syntax.objectComplement.text, pos: 'NOUN' }], { isObjectOrComplement: true, subject: syntax.subject });
       }
 
       if (tokens) {
@@ -235,7 +233,7 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
       }
     }
 
-    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex);
+    const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex, { isObjectOrComplement: true, subject: syntax.subject });
 
     // If verb is "make" and complement is adjective: "làm cho [O] [C]"
     let verbPhraseText = vpRes.translated;
@@ -248,8 +246,8 @@ function translateStructure(syntax, tenseInfo, verbPhrase, tokens, options = {})
     return parts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
-  // Default: S + V (e.g. "The sun shines.", "He works every day.", "The letter was written by Mary.")
-  const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex);
+  // Default: S + V
+  const trailingStr = translateTrailingModifiers(tokens, lastCoreIndex, { isObjectOrComplement: true, subject: syntax.subject });
   const parts = [subjStr, vpRes.translated, trailingStr].filter(Boolean);
   return parts.join(' ').replace(/\s+/g, ' ').trim();
 }

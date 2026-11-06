@@ -45,6 +45,65 @@ const NOUN_CLASSIFIERS = {
   'tree': 'cây'
 };
 
+const CO_REFERENT_MAP = {
+  'i': 'my',
+  'me': 'my',
+  'we': 'our',
+  'us': 'our',
+  'you': 'your',
+  'he': 'his',
+  'him': 'his',
+  'she': 'her',
+  'her': 'her',
+  'it': 'its',
+  'they': 'their',
+  'them': 'their'
+};
+
+const INTIMATE_OBJECTS = new Set([
+  'homework', 'family', 'phone', 'room', 'parent', 'parents', 'house', 'car',
+  'hand', 'hands', 'face', 'eye', 'eyes', 'teeth', 'tooth', 'life', 'job',
+  'work', 'mind', 'heart', 'dog', 'cat', 'clothes', 'coat', 'hat', 'shoes',
+  'wallet', 'keys', 'key', 'mother', 'father', 'brother', 'sister', 'child', 'children'
+]);
+
+/**
+ * Check if a possessive pronoun inside an object/complement NP is co-referent with the subject.
+ * In natural Vietnamese, co-referent possessives on personal belongings/tasks/family are omitted.
+ * @param {string} possessiveWord
+ * @param {Object} headNoun
+ * @param {Object} subject
+ * @returns {boolean}
+ */
+function isPossessiveRedundant(possessiveWord, headNoun, subject) {
+  if (!subject || !possessiveWord) return false;
+  const subjClean = (subject.head?.cleanWord || subject.cleanWord || subject.text || '').toLowerCase().trim();
+  const headClean = (headNoun?.cleanWord || headNoun?.text || '').toLowerCase().trim();
+
+  // Direct pronoun co-reference
+  const expectedPossessive = CO_REFERENT_MAP[subjClean];
+  if (expectedPossessive && expectedPossessive === possessiveWord) {
+    return INTIMATE_OBJECTS.has(headClean) || true;
+  }
+
+  // 3rd person singular masculine noun -> "his"
+  if (['boy', 'man', 'father', 'brother', 'son', 'husband', 'uncle'].includes(subjClean) && possessiveWord === 'his') {
+    return true;
+  }
+
+  // 3rd person singular feminine noun -> "her"
+  if (['girl', 'woman', 'mother', 'sister', 'daughter', 'wife', 'aunt'].includes(subjClean) && possessiveWord === 'her') {
+    return true;
+  }
+
+  // 3rd person plural noun -> "their"
+  if (['children', 'students', 'people', 'parents', 'friends', 'men', 'women'].includes(subjClean) && possessiveWord === 'their') {
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * Translate and restructure an English noun phrase into natural Vietnamese word order.
  * @param {Array<Object>} tokens Tagged tokens forming the noun phrase
@@ -56,6 +115,12 @@ function translateNounPhrase(tokens, options = {}) {
 
   // Single token NP
   if (tokens.length === 1) {
+    if (tokens[0].cleanWord === 'that' && options.isObjectOrComplement) {
+      return 'điều đó';
+    }
+    if (tokens[0].cleanWord === 'this' && options.isObjectOrComplement) {
+      return 'điều này';
+    }
     const wordRes = translateWord(tokens[0], options);
     return wordRes.translated;
   }
@@ -72,7 +137,13 @@ function translateNounPhrase(tokens, options = {}) {
 
     // 1. Possessive pronouns (my, your, his, her, its, our, their)
     if (POSSESSIVES_MAP[clean]) {
-      possessive = POSSESSIVES_MAP[clean];
+      const headTok = tokens.slice().reverse().find(tok => tok.pos === 'NOUN') || tokens[tokens.length - 1];
+      if (options.isObjectOrComplement && isPossessiveRedundant(clean, headTok, options.subject)) {
+        // Natural Vietnamese: co-referent possessive on object is dropped
+        possessive = null;
+      } else {
+        possessive = POSSESSIVES_MAP[clean];
+      }
       continue;
     }
 

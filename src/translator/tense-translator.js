@@ -28,7 +28,7 @@ const MODAL_TRANSLATIONS = {
 
 // Adverse verbs that take 'bị' in passive voice rather than 'được'
 const ADVERSE_VERBS = new Set([
-  'punish', 'kill', 'damage', 'destroy', 'fine', 'criticize', 'arrest', 'scold', 'hit', 'hurt', 'injure', 'steal', 'break'
+  'punish', 'kill', 'damage', 'destroy', 'fine', 'criticize', 'arrest', 'scold', 'hit', 'hurt', 'injure', 'steal', 'break', 'rob', 'wound', 'abandon', 'delay', 'reject', 'lose', 'infect', 'trap'
 ]);
 
 /**
@@ -62,24 +62,44 @@ function translateVerbPhrase(verbPhrase, tenseInfo, options = {}) {
 
   if (verbPhrase.isPhrasalVerb && verbPhrase.phrasalVerbName) {
     const pName = verbPhrase.phrasalVerbName.toLowerCase().trim();
-    verbGloss = CANONICAL_PHRASES[pName] || CANONICAL_PHRASES[verbPhrase.headVerb.lemma] || pName;
+    verbGloss = CANONICAL_PHRASES[pName] || CANONICAL_PHRASES[verbPhrase.headVerb?.lemma] || pName;
   } else if (headLemma) {
-    // Special handling for linking verb 'be'
-    if (headLemma === 'be') {
-      if (options.isLinkingNoun) {
-        verbGloss = 'là';
-      } else if (options.isLinkingAdj) {
-        verbGloss = 'thì'; // or omitted in Vietnamese, e.g. "thì thú vị" or "rất"
-      } else {
-        verbGloss = 'là';
+    // Special handling for linking verbs when followed by adjective complement
+    if (options.isLinkingAdj) {
+      if (headLemma === 'be') {
+        verbGloss = ''; // In Vietnamese: predicative adjectives don't take copula "là" (e.g. "cô ấy bận", "anh ấy mệt mỏi")
+      } else if (headLemma === 'look') {
+        verbGloss = 'trông';
+      } else if (headLemma === 'sound') {
+        verbGloss = 'nghe có vẻ';
+      } else if (headLemma === 'seem' || headLemma === 'appear') {
+        verbGloss = 'có vẻ';
+      } else if (headLemma === 'taste') {
+        verbGloss = 'có vị';
+      } else if (headLemma === 'smell') {
+        verbGloss = 'có mùi';
+      } else if (headLemma === 'feel') {
+        verbGloss = 'cảm thấy';
+      } else if (headLemma === 'become') {
+        verbGloss = 'trở nên';
       }
-    } else if (headLemma === 'taste') {
-      verbGloss = 'có vị';
-    } else if (CORE_LEXICON_PREFERENCES[headLemma] && CORE_LEXICON_PREFERENCES[headLemma].pos === 'VERB') {
-      verbGloss = CORE_LEXICON_PREFERENCES[headLemma].gloss;
     } else {
-      const vWordRes = translateWord(headTok ? { text: headTok.text, cleanWord: headTok.cleanWord, lemma: headLemma, pos: 'VERB' } : headLemma, { pos: 'VERB' });
-      verbGloss = vWordRes.translated;
+      if (headLemma === 'be') {
+        verbGloss = options.isLinkingNoun ? 'là' : 'là';
+      } else if (headLemma === 'taste') {
+        verbGloss = 'có vị';
+      } else if (headLemma === 'seem') {
+        verbGloss = 'có vẻ';
+      } else if (headLemma === 'become') {
+        verbGloss = 'trở nên';
+      } else if (headLemma === 'sound') {
+        verbGloss = 'nghe có vẻ';
+      } else if (CORE_LEXICON_PREFERENCES[headLemma] && CORE_LEXICON_PREFERENCES[headLemma].pos === 'VERB') {
+        verbGloss = CORE_LEXICON_PREFERENCES[headLemma].gloss;
+      } else {
+        const vWordRes = translateWord(headTok ? { text: headTok.text, cleanWord: headTok.cleanWord, lemma: headLemma, pos: 'VERB' } : headLemma, { pos: 'VERB' });
+        verbGloss = vWordRes.translated;
+      }
     }
   }
 
@@ -107,7 +127,12 @@ function translateVerbPhrase(verbPhrase, tenseInfo, options = {}) {
   } else if (tense === 'Present Perfect' || tense === 'Present Perfect Continuous') {
     tenseParticle = isNegative ? '' : 'đã';
   } else if (tense === 'Past Simple' || tense === 'Past Perfect' || tense === 'Past Perfect Continuous') {
-    tenseParticle = isNegative ? '' : 'đã';
+    // For linking verb 'become', do not insert redundant 'đã'
+    if (headLemma === 'become' || (headLemma === 'be' && options.isLinkingAdj)) {
+      tenseParticle = '';
+    } else {
+      tenseParticle = isNegative ? '' : 'đã';
+    }
   } else {
     // Present Simple: natural Vietnamese does not require a time particle
     tenseParticle = '';
@@ -120,10 +145,20 @@ function translateVerbPhrase(verbPhrase, tenseInfo, options = {}) {
     voiceParticle = isAdverse ? 'bị' : 'được';
   }
 
-  // 5. Negation Particle ('không' or 'chưa')
+  // 5. Negation Particle ('không', 'chưa', 'chưa bao giờ', 'không bao giờ')
+  const isNever = (verbPhrase.negationWord && verbPhrase.negationWord.toLowerCase() === 'never') ||
+                  (options.tokens && options.tokens.some(t => t.cleanWord === 'never'));
+
   let negationParticle = '';
-  if (isNegative) {
-    if (tense.startsWith('Present Perfect') && !verbPhrase.negationWord?.includes('never')) {
+  if (isNever) {
+    if (tense.startsWith('Present Perfect') || tense === 'Past Simple') {
+      negationParticle = 'chưa bao giờ';
+    } else {
+      negationParticle = 'không bao giờ';
+    }
+    tenseParticle = '';
+  } else if (isNegative) {
+    if (tense.startsWith('Present Perfect')) {
       negationParticle = 'chưa';
     } else {
       negationParticle = 'không';
@@ -135,12 +170,31 @@ function translateVerbPhrase(verbPhrase, tenseInfo, options = {}) {
   if (tenseParticle && !isNegative) {
     vpParts.push(tenseParticle);
   }
+
   if (isNegative) {
-    if (tenseParticle === 'đã' || tenseParticle === 'sẽ') {
-      vpParts.push(tenseParticle);
+    if (modalParticle) {
+      // In Vietnamese: "không nên", "không thể", "không phải", "sẽ không"
+      if (modalParticle === 'nên') {
+        vpParts.push('không nên');
+      } else if (modalParticle === 'có thể') {
+        vpParts.push('không thể');
+      } else if (modalParticle === 'phải') {
+        vpParts.push('không phải');
+      } else if (modalParticle === 'sẽ') {
+        vpParts.push('sẽ không');
+      } else {
+        vpParts.push(`không ${modalParticle}`);
+      }
+    } else {
+      if (tenseParticle === 'đã' || tenseParticle === 'sẽ') {
+        vpParts.push(tenseParticle);
+      }
+      if (negationParticle) {
+        vpParts.push(negationParticle);
+      }
     }
-    vpParts.push(negationParticle);
   }
+
   if (voiceParticle) {
     vpParts.push(voiceParticle);
   }

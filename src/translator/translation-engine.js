@@ -97,10 +97,21 @@ function translateSentence(sentenceText, options = {}) {
   const wordTokens = analysis.tokens.filter(t => t.isWord);
   const unknownWords = [];
   const uncertainWords = [];
+  const selectedWordMeanings = [];
   let wordsTranslated = 0;
 
   for (const t of wordTokens) {
     const wRes = translateWord(t);
+    selectedWordMeanings.push({
+      word: t.text,
+      cleanWord: t.cleanWord,
+      pos: wRes.pos || t.pos,
+      lemma: wRes.lemma || t.lemma,
+      translated: wRes.translated,
+      source: wRes.source || 'dictionary',
+      confidence: wRes.confidence
+    });
+
     if (wRes.isUnknown) {
       unknownWords.push(t.text);
     } else if (wRes.confidence === 'medium') {
@@ -109,6 +120,17 @@ function translateSentence(sentenceText, options = {}) {
     } else {
       wordsTranslated++;
     }
+  }
+
+  const uncertaintyReasons = [];
+  if (unknownWords.length > 0) {
+    uncertaintyReasons.push(`Contains unknown non-dictionary word(s): ${unknownWords.join(', ')}`);
+  }
+  if (uncertainWords.length > 0) {
+    uncertaintyReasons.push(`Contains ambiguous word(s): ${uncertainWords.join(', ')}`);
+  }
+  if (analysis.tense?.confidence === 'medium' || analysis.tense?.confidence === 'low') {
+    uncertaintyReasons.push(`Tense determination has ${analysis.tense?.confidence} confidence`);
   }
 
   // 4. Translate based on Clause Architecture
@@ -130,13 +152,17 @@ function translateSentence(sentenceText, options = {}) {
   const formatted = formatTranslation(rawTranslation, trimmed, {
     sentenceType: analysis.tense?.sentenceType || 'declarative',
     tense: analysis.tense?.tense || 'Present Simple',
+    voice: analysis.tense?.voice || 'active',
+    aspect: analysis.tense?.aspect || 'simple',
     pattern: analysis.syntax?.pattern || 'S+V',
     clausesCount: clauses.length,
     wordsCount: wordTokens.length,
     wordsTranslated,
     phrasesRecognized: matchedPhrases.length,
     unknownWords,
-    uncertainWords
+    uncertainWords,
+    uncertaintyReasons,
+    selectedWordMeanings
   });
 
   // Attach metadata
