@@ -47,10 +47,12 @@ function detectSentenceType(tokens, verbPhrases) {
     }
   }
 
-  // Imperative: Starts with base verb, no preceding subject
+  // Imperative: Starts with base verb, no preceding subject (or after 'please')
   if (verbPhrases && verbPhrases.length > 0) {
     const firstVp = verbPhrases[0];
-    if (firstVp.startIndex === tokens[0].startIndex) {
+    const isAtStartOrAfterPlease = firstVp.startIndex === tokens[0].startIndex ||
+      (tokens[0].cleanWord === 'please' && tokens.length > 1 && firstVp.startIndex === tokens[1].startIndex);
+    if (isAtStartOrAfterPlease) {
       if (firstVp.headVerb && (firstVp.headVerb.form === 'base' || firstVp.headVerb.cleanWord === 'let')) {
         return 'imperative';
       }

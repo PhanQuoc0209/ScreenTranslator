@@ -173,9 +173,40 @@ async function runTests() {
   assert.strictEqual(clauseData.length, 2);
   assert.strictEqual(clauseData[0].type, 'conditional');
   assert.strictEqual(clauseData[1].type, 'independent');
+  console.log('✓ Offline sentence structure analyzer tests passed.');
+
+  // Test 11: Offline Rule-Based Translation Engine (src/translator/index.js)
+  console.log('\n--- Test 11: Offline Rule-Based Translation Engine (src/translator/index.js) ---');
+  const {
+    translateSentence,
+    translateText: translateOfflineText,
+    clearTranslationCache,
+    getTranslationCacheStats
+  } = require('./src/translator/index');
+
+  const t1 = translateSentence('I love you.');
+  assert.strictEqual(t1.translatedText, 'Tôi yêu bạn.');
+  assert.strictEqual(t1.confidence, 'high');
+  assert.strictEqual(t1.pattern, 'S+V+O');
+
+  const t2 = translateSentence('I am studying English.');
+  assert.strictEqual(t2.translatedText, 'Tôi đang học tiếng Anh.');
+  assert.strictEqual(t2.tense, 'Present Continuous');
+
+  const t3 = translateSentence('I look forward to meeting you.');
+  assert.strictEqual(t3.translatedText, 'Tôi mong đợi gặp bạn.');
+
+  const t4 = translateSentence('The device xyz123 was broken.');
+  assert.strictEqual(t4.translatedText, 'Thiết bị xyz123 đã bị hỏng.');
+  assert.ok(t4.diagnostics.unknownWords.includes('xyz123'));
+
+  const multiTrans = translateOfflineText('She reads books. The sun shines.');
+  assert.strictEqual(multiTrans.length, 2);
+  assert.strictEqual(multiTrans[0].translatedText, 'Cô ấy đọc sách.');
+  assert.strictEqual(multiTrans[1].translatedText, 'Mặt trời chiếu sáng.');
 
   closeDatabase();
-  console.log('✓ Offline sentence structure analyzer tests passed.');
+  console.log('✓ Offline translation engine tests passed.');
 
   console.log('\n=============================================');
   console.log(' ALL MODULAR UNIT & INTEGRATION TESTS PASSED ');

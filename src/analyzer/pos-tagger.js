@@ -68,7 +68,11 @@ const ADVERBS_COMMON = new Set([
 ]);
 
 const INTERJECTIONS = new Set([
-  'hello', 'hi', 'hey', 'oh', 'ah', 'wow', 'oops', 'alas', 'ouch', 'hurray', 'bravo'
+  'hello', 'hi', 'hey', 'oh', 'ah', 'wow', 'oops', 'alas', 'ouch', 'hurray', 'bravo', 'please'
+]);
+
+const COMMON_PARTICIPIAL_ADJECTIVES = new Set([
+  'interesting', 'boring', 'exciting', 'surprising', 'charming', 'amazing', 'confusing', 'tiring', 'frightening'
 ]);
 
 /**
@@ -174,6 +178,32 @@ function tagSentence(tokens) {
     }
 
     // 7. Closed-class Lookups
+    if (COMMON_PARTICIPIAL_ADJECTIVES.has(clean)) {
+      tagged.push({
+        ...tok,
+        pos: 'ADJECTIVE',
+        posCandidates: ['ADJECTIVE'],
+        lemma: clean,
+        confidence: 'high'
+      });
+      continue;
+    }
+
+    if (clean === 'that') {
+      // Preceded by verb or noun -> conjunction / relative pronoun (e.g. "know that...", "book that...")
+      const prevTok = i > 0 ? tagged[i - 1] : null;
+      if (prevTok && (prevTok.pos === 'VERB' || prevTok.pos === 'NOUN' || prevTok.pos === 'PRONOUN')) {
+        tagged.push({
+          ...tok,
+          pos: 'CONJUNCTION',
+          posCandidates: ['CONJUNCTION', 'DETERMINER', 'PRONOUN'],
+          lemma: 'that',
+          confidence: 'high'
+        });
+        continue;
+      }
+    }
+
     if (DETERMINERS.has(clean)) {
       tagged.push({
         ...tok,
@@ -389,8 +419,8 @@ function tagSentence(tokens) {
         ambiguous = false;
         confidence = 'high';
       }
-    } else if (i === 0 && candidates.has('VERB') && next && (DETERMINERS.has(next.cleanWord) || PRONOUNS.has(next.cleanWord) || PREPOSITIONS.has(next.cleanWord) || next.isWord)) {
-      // Imperative at sentence start: e.g. "Open the door", "Look at him"
+    } else if ((i === 0 || (prev && prev.pos === 'INTERJECTION')) && candidates.has('VERB') && next && (DETERMINERS.has(next.cleanWord) || PRONOUNS.has(next.cleanWord) || PREPOSITIONS.has(next.cleanWord) || next.isWord)) {
+      // Imperative at sentence start or after interjection: e.g. "Open the door", "Please take care of"
       pos = 'VERB';
       ambiguous = false;
       confidence = 'high';
