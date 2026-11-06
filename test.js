@@ -83,6 +83,61 @@ async function runTests() {
   assert.strictEqual(typeof clipboardModule.readFromClipboard, 'function');
   console.log('✓ Clipboard module tests passed.');
 
+  // Test 6: Dictionary Database Integration
+  console.log('\n--- Test 6: Offline Dictionary Database (src/dictionary/db.js) ---');
+  const { getDatabase, getDatabaseStats, getAttribution, closeDatabase } = require('./src/dictionary/db');
+  const db = getDatabase();
+  assert.ok(db, 'Database connection must be established');
+  const stats = getDatabaseStats();
+  assert.strictEqual(stats.words, 104829, 'Exact word count must match');
+  assert.strictEqual(stats.definitions, 158307, 'Exact definition count must match');
+  assert.strictEqual(stats.links, 175735, 'Exact word-definition links must match');
+  assert.strictEqual(stats.pronunciations, 108776, 'Exact pronunciations count must match');
+
+  const attrib = getAttribution();
+  assert.ok(attrib.license.includes('CC BY-SA 4.0'), 'Attribution must include CC BY-SA 4.0');
+  console.log('✓ Dictionary database module tests passed.');
+
+  // Test 7: Offline Dictionary Engine & Word Lookup
+  console.log('\n--- Test 7: Offline Dictionary Engine (src/dictionary/dictionary.js) ---');
+  const { lookupWord, lookupPhrase } = require('./src/dictionary/dictionary');
+  const helloLookup = lookupWord('  HELLO  ');
+  assert.strictEqual(helloLookup.found, true);
+  assert.strictEqual(helloLookup.word, 'hello');
+  assert.ok(helloLookup.meanings.length > 0);
+
+  const phraseLookup = lookupPhrase('look forward to');
+  assert.strictEqual(phraseLookup.found, true);
+  assert.strictEqual(phraseLookup.word, 'look forward to');
+  console.log('✓ Dictionary engine lookup tests passed.');
+
+  // Test 8: Offline Phrase & Idiom Matcher
+  console.log('\n--- Test 8: Phrase & Idiom Matcher (src/dictionary/phrase-matcher.js) ---');
+  const { matchPhrases } = require('./src/dictionary/phrase-matcher');
+  const testSentence = 'We must find out how to take care of this and not give up.';
+  const phraseMatches = matchPhrases(testSentence);
+  const foundPhrases = phraseMatches.filter(m => m.matchType === 'phrasal_verb').map(m => m.word);
+  assert.ok(foundPhrases.includes('find out'), 'Must match find out');
+  assert.ok(foundPhrases.includes('take care of'), 'Must match take care of');
+  assert.ok(foundPhrases.includes('give up'), 'Must match give up');
+  console.log('✓ Phrase & idiom matcher tests passed.');
+
+  // Test 9: Offline Lemmatizer & Morphological Analyzer
+  console.log('\n--- Test 9: Offline Lemmatizer (src/dictionary/lemmatizer.js) ---');
+  const { lemmatizeWord, lemmatizeSentence } = require('./src/dictionary/lemmatizer');
+  const l1 = lemmatizeWord('running');
+  assert.ok(l1.lemmas.includes('run'));
+  const l2 = lemmatizeWord('children');
+  assert.ok(l2.lemmas.includes('child'));
+  const l3 = lemmatizeWord('walked');
+  assert.ok(l3.lemmas.includes('walk'));
+  const l4 = lemmatizeWord('better');
+  assert.ok(l4.lemmas.includes('good') && l4.lemmas.includes('well'));
+  const sentRes = lemmatizeSentence('The children were running');
+  assert.ok(sentRes.tokens.length === 4);
+  closeDatabase();
+  console.log('✓ Offline lemmatizer tests passed.');
+
   console.log('\n=============================================');
   console.log(' ALL MODULAR UNIT & INTEGRATION TESTS PASSED ');
   console.log('=============================================');

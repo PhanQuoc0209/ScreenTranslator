@@ -2,7 +2,7 @@ const { app, Tray, Menu, globalShortcut, ipcMain, nativeImage, Notification, she
 const path = require('path');
 const fs = require('fs');
 
-const { startSnippet } = require('./src/capture/capture');
+const { startSnippet, cropImage } = require('./src/capture/capture');
 const { recognizeText, terminateWorker } = require('./src/ocr/ocr');
 const { translateText } = require('./src/translation/translate');
 const { copyToClipboard } = require('./src/clipboard/clipboard');
@@ -17,6 +17,7 @@ const {
 } = require('./src/storage/storage');
 const { showFloatingWindow, closeFloatingWindow, getFloatingWindow } = require('./src/windows/floating-window');
 const { openSettingsWindow } = require('./src/windows/settings-window');
+const { closeDatabase } = require('./src/dictionary/db');
 
 let tray = null;
 let lastCapturedBuffer = null;
@@ -28,7 +29,6 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    // When a second instance is launched, trigger capture or show window
     triggerScreenCapture();
   });
 }
@@ -43,22 +43,21 @@ function createTray() {
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath);
   } else {
-    // Fallback: create an empty 16x16 icon
     icon = nativeImage.createEmpty();
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('Screen Translator (Press Ctrl + Shift + S)');
+  tray.setToolTip('Screen Translator (Nhấn Ctrl + Shift + S để dịch)');
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open Screen Translator',
+      label: 'Mở Trình Dịch (Open Translator)',
       click: () => {
         showFloatingWindow();
       }
     },
     {
-      label: 'Capture Screen',
+      label: 'Chụp Vùng Màn Hình (Capture Screen)',
       accelerator: 'Ctrl+Shift+S',
       click: () => {
         triggerScreenCapture();
@@ -66,20 +65,20 @@ function createTray() {
     },
     { type: 'separator' },
     {
-      label: 'Settings',
+      label: 'Cài Đặt (Settings)',
       click: () => {
         openSettingsWindow();
       }
     },
     {
-      label: 'Open Captures Folder',
+      label: 'Mở Thư Mục Ảnh Chụp (Open Captures)',
       click: () => {
         shell.openPath(getStorageDir());
       }
     },
     { type: 'separator' },
     {
-      label: 'Exit',
+      label: 'Thoát (Exit)',
       click: () => {
         app.isQuitting = true;
         app.quit();
@@ -89,12 +88,10 @@ function createTray() {
 
   tray.setContextMenu(contextMenu);
 
-  // Left click on tray triggers capture or window
   tray.on('click', () => {
     showFloatingWindow();
   });
 
-  // Double click triggers capture
   tray.on('double-click', () => {
     triggerScreenCapture();
   });
@@ -120,10 +117,9 @@ function registerShortcuts() {
 }
 
 /**
- * Execute the full screen capture -> local OCR -> floating window workflow.
+ * Execute the full screen capture -> local OCR -> instant translation workflow.
  */
 function triggerScreenCapture() {
-  // If floating window is open, close or hide it during capture
   closeFloatingWindow();
 
   startSnippet(
@@ -135,12 +131,14 @@ function triggerScreenCapture() {
         // Auto-save screenshot locally
         const savedPath = saveScreenshotAuto(buffer);
 
-        // Open floating window positioned near the capture selection
+        // Position window right next to selection
         const targetCoords = {
-          x: rect ? rect.x + 20 : undefined,
-          y: rect ? rect.y + 20 : undefined
+          x: rect ? rect.x + rect.width : undefined,
+          y: rect ? rect.y : undefined,
+          rectX: rect ? rect.x : undefined
         };
 
+        // Open floating window immediately with loading state
         const floating = showFloatingWindow({
           screenshotDataUrl: dataUrl,
           originalText: '',
@@ -153,7 +151,7 @@ function triggerScreenCapture() {
           if (floating && !floating.isDestroyed()) {
             const p = progressInfo && typeof progressInfo.progress === 'number' ? progressInfo.progress : 0.5;
             floating.webContents.send('ocr:progress', {
-              status: progressInfo.status || 'Extracting text...',
+              status: progressInfo.status || 'Đang nhận diện ký tự...',
               progress: Math.round(p * 100)
             });
           }
@@ -161,16 +159,23 @@ function triggerScreenCapture() {
 
         const extractedText = ocrResult.success ? ocrResult.text : '';
 
-        // Auto-translate if text is present
+        // Instant Translation as soon as OCR completes
         let translatedText = '';
         if (extractedText) {
+          if (floating && !floating.isDestroyed()) {
+            floating.webContents.send('ocr:progress', {
+              status: 'Đang dịch ngay...',
+              progress: 95
+            });
+          }
+
           const transResult = await translateText(extractedText, 'auto', 'vi');
           if (transResult.success) {
             translatedText = transResult.translated;
           }
         }
 
-        // Send completed data to floating window
+        // Send completed OCR + Instant Translation to floating window
         if (floating && !floating.isDestroyed()) {
           floating.webContents.send('floating:set-data', {
             screenshotDataUrl: dataUrl,
@@ -207,12 +212,11 @@ app.whenReady().then(() => {
   createTray();
   registerShortcuts();
 
-  // If launched with notification support, inform user that app is running in tray
   if (Notification.isSupported()) {
     try {
       new Notification({
         title: 'Screen Translator',
-        body: 'Running in the background. Press Ctrl + Shift + S anytime to translate.'
+        body: 'Đang chạy nền. Nhấn Ctrl + Shift + S bất kỳ lúc nào để bôi đen dịch tức thì.'
       }).show();
     } catch (e) {
       // ignore
@@ -226,11 +230,12 @@ app.whenReady().then(() => {
 app.on('will-quit', async () => {
   globalShortcut.unregisterAll();
   await terminateWorker();
+  closeDatabase();
 });
 
-// Do NOT quit when windows close — stay active in system tray
+// Keep running in background tray when windows close
 app.on('window-all-closed', () => {
-  // Keep running in background tray
+  // Stay resident in system tray
 });
 
 // IPC: Close floating window
@@ -247,9 +252,19 @@ ipcMain.handle('screen:start-snip', async () => {
 // IPC: Retry OCR with specific languages
 ipcMain.handle('ocr:retry', async (event, langs) => {
   if (!lastCapturedBuffer) {
-    return { success: false, text: '', error: 'No screenshot available.' };
+    return { success: false, text: '', error: 'Chưa có ảnh chụp màn hình.' };
   }
   return await recognizeText(lastCapturedBuffer, langs || ['eng', 'vie']);
+});
+
+// IPC: OCR on Sub-Image (when user highlights on image preview)
+ipcMain.handle('ocr:sub-image', async (event, subImageDataUrl) => {
+  if (!subImageDataUrl) {
+    return { success: false, text: '', error: 'Ảnh vùng chọn trống.' };
+  }
+  const base64Data = subImageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+  const buffer = Buffer.from(base64Data, 'base64');
+  return await recognizeText(buffer, ['eng', 'vie']);
 });
 
 // IPC: Translate Text
@@ -271,7 +286,7 @@ ipcMain.handle('storage:save-screenshot', async (event, dataUrl) => {
     buf = Buffer.from(base64, 'base64');
   }
   if (!buf) {
-    return { success: false, error: 'No screenshot available.' };
+    return { success: false, error: 'Chưa có ảnh để lưu.' };
   }
   const filePath = await saveScreenshotAs(win, buf);
   return { success: !!filePath, filePath };
@@ -281,7 +296,7 @@ ipcMain.handle('storage:save-screenshot', async (event, dataUrl) => {
 ipcMain.handle('storage:save-text', async (event, { text, defaultName }) => {
   const win = getFloatingWindow();
   if (!text || !text.trim()) {
-    return { success: false, error: 'Text is empty.' };
+    return { success: false, error: 'Văn bản trống.' };
   }
   const filePath = await saveTextAs(win, text, defaultName);
   return { success: !!filePath, filePath };

@@ -57,7 +57,7 @@ html, body {
   background: var(--bg-app);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-window);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
   overflow: hidden;
 }
 
@@ -67,10 +67,10 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 14px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
-  min-height: 44px;
+  min-height: 42px;
 }
 
 .header-brand {
@@ -105,7 +105,7 @@ html, body {
   gap: 6px;
 }
 
-/* Action Buttons */
+/* Buttons */
 button {
   font-family: inherit;
   font-size: 12px;
@@ -144,6 +144,16 @@ button:active {
   border-color: var(--accent-blue-hover);
 }
 
+.btn-secondary {
+  background: var(--bg-app);
+  color: var(--text-main);
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 11.5px;
+}
+
 .btn-icon {
   padding: 5px 8px;
 }
@@ -158,12 +168,55 @@ button:active {
   border-color: var(--danger-red);
 }
 
+/* Interactive Image Drawer (Bôi đen trực tiếp trên ảnh) */
+.image-drawer {
+  display: none;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 12px;
+  gap: 6px;
+  max-height: 160px;
+}
+
+.image-drawer.open {
+  display: flex;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.image-canvas-wrapper {
+  width: 100%;
+  height: 110px;
+  background: #0f172a;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+  cursor: crosshair;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#image-canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* Language Selection Toolbar */
 .lang-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 6px 14px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
   gap: 8px;
@@ -176,17 +229,35 @@ button:active {
   flex: 1;
 }
 
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-copy-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.auto-copy-label input {
+  cursor: pointer;
+}
+
 select {
   font-family: inherit;
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   background: var(--bg-app);
   color: var(--text-main);
   outline: none;
   cursor: pointer;
-  flex: 1;
 }
 
 select:focus {
@@ -198,8 +269,8 @@ select:focus {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px;
-  gap: 10px;
+  padding: 10px 14px;
+  gap: 8px;
   overflow-y: auto;
 }
 
@@ -210,10 +281,20 @@ select:focus {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 10px;
+  padding: 8px 10px;
   gap: 6px;
   flex: 1;
-  min-height: 120px;
+}
+
+.translation-card {
+  border-color: rgba(37, 99, 235, 0.4);
+  background: var(--accent-light);
+}
+
+@media (prefers-color-scheme: dark) {
+  .translation-card {
+    background: rgba(30, 58, 138, 0.25);
+  }
 }
 
 .section-header {
@@ -223,8 +304,28 @@ select:focus {
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-trans {
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 9.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+.highlight-hint {
+  font-size: 10.5px;
+  font-weight: normal;
+  color: var(--text-muted);
 }
 
 .section-actions {
@@ -242,11 +343,16 @@ select:focus {
   color: var(--text-main);
   padding: 8px 10px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.5;
   resize: none;
   outline: none;
   user-select: text;
+}
+
+.text-trans {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .text-area:focus {
@@ -280,6 +386,7 @@ select:focus {
 
 .status-dot.active {
   background: var(--accent-blue);
+  animation: pulse 1s infinite alternate;
 }
 
 .status-dot.success {
@@ -288,6 +395,15 @@ select:focus {
 
 .status-dot.error {
   background: var(--danger-red);
+}
+
+.footer-hint {
+  font-size: 11px;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.3); opacity: 1; }
 }
 
 /* Toast */

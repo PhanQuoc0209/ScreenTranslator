@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // OCR actions
   runOcr: (langs) => ipcRenderer.invoke('ocr:retry', langs),
+  runOcrSubImage: (subImageDataUrl) => ipcRenderer.invoke('ocr:sub-image', subImageDataUrl),
 
   // Clipboard actions
   copyToClipboard: (text) => ipcRenderer.invoke('clipboard:copy', text),

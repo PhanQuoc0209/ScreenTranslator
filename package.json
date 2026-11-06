@@ -20,6 +20,8 @@
     "electron": "^45.2.3"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "screenshot-desktop": "^1.15.8",
     "tesseract.js": "^7.0.0"
   }
 }

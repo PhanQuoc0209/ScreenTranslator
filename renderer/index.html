@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,99 +16,122 @@
       </div>
 
       <div class="header-controls">
-        <button id="btn-header-snip" class="btn-primary" title="Capture another region (Ctrl+Shift+S)">
+        <button id="btn-toggle-image" class="btn-sm btn-secondary" title="Xem ảnh chụp & bôi đen chọn vùng dịch">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+          <span id="lbl-toggle-image">Xem ảnh</span>
+        </button>
+
+        <button id="btn-header-snip" class="btn-primary btn-sm" title="Chụp vùng khác (Ctrl + Shift + S)">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="16"></line>
             <line x1="8" y1="12" x2="16" y2="12"></line>
           </svg>
-          <span>Snip</span>
+          <span>Chụp mới</span>
         </button>
 
-        <button id="btn-save-all" class="btn-icon" title="Save screenshot & text">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-          </svg>
-        </button>
-
-        <button id="btn-close" class="btn-icon btn-close" title="Close window">
+        <button id="btn-close" class="btn-icon btn-close" title="Đóng cửa sổ (Esc)">
           ✕
         </button>
       </div>
     </header>
 
+    <!-- Interactive Image Snipping Drawer (Bôi đen trực tiếp trên ảnh) -->
+    <div id="image-drawer" class="image-drawer">
+      <div class="drawer-header">
+        <span>Kéo chuột bôi đen vùng trên ảnh để dịch ngay:</span>
+        <button id="btn-reset-crop" class="btn-sm btn-secondary" title="Xem toàn bộ ảnh">Toàn ảnh</button>
+      </div>
+      <div class="image-canvas-wrapper" id="canvas-wrapper">
+        <canvas id="image-canvas"></canvas>
+      </div>
+    </div>
+
     <!-- Language Toolbar -->
     <div class="lang-toolbar">
       <div class="lang-selectors">
-        <select id="source-lang">
-          <option value="en" selected>English</option>
-          <option value="vi">Vietnamese</option>
-          <option value="auto">Auto-detect</option>
+        <select id="source-lang" title="Ngôn ngữ gốc">
+          <option value="auto">Tự động phát hiện</option>
+          <option value="en" selected>Tiếng Anh (EN)</option>
+          <option value="vi">Tiếng Việt (VI)</option>
         </select>
 
-        <button id="btn-swap-lang" class="btn-icon" title="Swap languages">
+        <button id="btn-swap-lang" class="btn-icon" title="Đổi chiều dịch (⇄)">
           ⇄
         </button>
 
-        <select id="target-lang">
-          <option value="vi" selected>Vietnamese</option>
-          <option value="en">English</option>
+        <select id="target-lang" title="Ngôn ngữ dịch">
+          <option value="vi" selected>Tiếng Việt (VI)</option>
+          <option value="en">Tiếng Anh (EN)</option>
         </select>
       </div>
 
-      <button id="btn-translate" class="btn-primary">
-        Translate
-      </button>
+      <div class="toolbar-actions">
+        <label class="auto-copy-label" title="Tự động sao chép bản dịch khi có kết quả">
+          <input type="checkbox" id="chk-auto-copy">
+          <span>Tự copy</span>
+        </label>
+        <button id="btn-translate" class="btn-primary btn-sm">
+          Dịch lại
+        </button>
+      </div>
     </div>
 
     <!-- Main Content Area -->
     <div class="window-content">
-      <!-- Original Text Section -->
+      <!-- Translation Section (Ưu tiên hiển thị nổi bật kết quả dịch) -->
+      <div class="section-card translation-card">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="badge-trans">DỊCH</span>
+            <span>BẢN DỊCH TỨC THÌ</span>
+          </div>
+          <div class="section-actions">
+            <button id="btn-copy-trans" class="btn-primary btn-sm" title="Sao chép bản dịch">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Copy</span>
+            </button>
+            <button id="btn-save-trans-txt" class="btn-secondary btn-sm" title="Lưu bản dịch vào file .txt">
+              <span>Lưu</span>
+            </button>
+          </div>
+        </div>
+        <textarea id="text-trans" class="text-area text-trans" placeholder="Kết quả dịch sẽ xuất hiện ở đây ngay khi bôi đen hình ảnh..."></textarea>
+      </div>
+
+      <!-- Original Text Section (OCR) -->
       <div class="section-card">
         <div class="section-header">
-          <span>Original Text (OCR)</span>
+          <div class="section-title">
+            <span>VĂN BẢN GỐC (OCR)</span>
+            <span id="highlight-tip" class="highlight-hint">Bôi đen chữ bất kỳ để dịch riêng cụm đó</span>
+          </div>
           <div class="section-actions">
-            <button id="btn-retry-ocr" class="btn-icon" title="Retry OCR on captured image">
+            <button id="btn-retry-ocr" class="btn-icon" title="Nhận diện lại chữ từ ảnh">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
               </svg>
             </button>
-            <button id="btn-copy-orig" class="btn-icon" title="Copy original text">
+            <button id="btn-copy-orig" class="btn-icon" title="Sao chép văn bản gốc">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
-              <span>Copy</span>
             </button>
-            <button id="btn-save-orig-txt" class="btn-icon" title="Save original text to .txt">
-              <span>Save</span>
-            </button>
-          </div>
-        </div>
-        <textarea id="text-orig" class="text-area" placeholder="Captured text will appear here..."></textarea>
-      </div>
-
-      <!-- Translation Section -->
-      <div class="section-card">
-        <div class="section-header">
-          <span>Translation</span>
-          <div class="section-actions">
-            <button id="btn-copy-trans" class="btn-icon" title="Copy translation">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              <span>Copy</span>
-            </button>
-            <button id="btn-save-trans-txt" class="btn-icon" title="Save translation to .txt">
-              <span>Save</span>
+            <button id="btn-save-orig-txt" class="btn-icon" title="Lưu văn bản gốc">
+              <span>Lưu</span>
             </button>
           </div>
         </div>
-        <textarea id="text-trans" class="text-area" placeholder="Translated text will appear here..."></textarea>
+        <textarea id="text-orig" class="text-area" placeholder="Văn bản nhận diện từ hình ảnh..."></textarea>
       </div>
     </div>
 
@@ -116,13 +139,13 @@
     <footer class="window-footer">
       <div class="status-box">
         <span class="status-dot" id="status-dot"></span>
-        <span id="status-text">Ready</span>
+        <span id="status-text">Sẵn sàng dịch</span>
       </div>
-      <div id="status-shortcut" style="font-size: 11px;">Ctrl + Shift + S</div>
+      <div class="footer-hint">Ctrl + Shift + S • Esc để đóng</div>
     </footer>
   </div>
 
-  <div class="toast" id="toast">Notification</div>
+  <div class="toast" id="toast">Thông báo</div>
 
   <script src="renderer.js"></script>
 </body>

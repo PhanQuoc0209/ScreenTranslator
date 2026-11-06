@@ -1,24 +1,40 @@
-const { desktopCapturer, screen, BrowserWindow, ipcMain } = require('electron');
+const { screen, BrowserWindow, ipcMain, nativeImage } = require('electron');
 const path = require('path');
+const screenshot = require('screenshot-desktop');
 
 let overlayWindow = null;
 
 /**
- * Capture full screen snapshot using desktopCapturer.
+ * Capture full screen snapshot reliably using native Windows capture.
  * @returns {Promise<import('electron').NativeImage|null>}
  */
 async function captureFullScreen() {
   try {
+    // 1. Primary: Native Windows screen capture (fast, reliable, handles all Windows sessions)
+    const imgBuffer = await screenshot({ format: 'png' });
+    if (imgBuffer && imgBuffer.length > 0) {
+      const nativeImg = nativeImage.createFromBuffer(imgBuffer);
+      if (!nativeImg.isEmpty()) {
+        return nativeImg;
+      }
+    }
+  } catch (err) {
+    console.warn('Native screenshot failed, trying fallback...', err.message);
+  }
+
+  // 2. Fallback: Electron desktopCapturer if native fails
+  try {
+    const { desktopCapturer } = require('electron');
     const primaryDisplay = screen.getPrimaryDisplay();
     const scaleFactor = primaryDisplay.scaleFactor || 1;
     const { width, height } = primaryDisplay.size;
 
-    const targetWidth = Math.round(width * scaleFactor);
-    const targetHeight = Math.round(height * scaleFactor);
-
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
-      thumbnailSize: { width: targetWidth, height: targetHeight },
+      thumbnailSize: {
+        width: Math.round(width * scaleFactor),
+        height: Math.round(height * scaleFactor)
+      },
       fetchWindowIcons: false
     });
 
@@ -28,11 +44,11 @@ async function captureFullScreen() {
         return source.thumbnail;
       }
     }
-    return null;
-  } catch (err) {
-    console.error('Error capturing full screen:', err);
-    return null;
+  } catch (fallbackErr) {
+    console.error('Fallback desktopCapturer failed:', fallbackErr.message);
   }
+
+  return null;
 }
 
 /**
@@ -44,7 +60,7 @@ async function captureFullScreen() {
  */
 function cropImage(image, rect, scaleFactor = 1) {
   if (!image || image.isEmpty()) {
-    throw new Error('Cannot crop empty image.');
+    throw new Error('Cannot crop empty image / Không thể cắt ảnh từ màn hình trống.');
   }
 
   const imgSize = image.getSize();
@@ -54,7 +70,7 @@ function cropImage(image, rect, scaleFactor = 1) {
   const scaledH = Math.min(imgSize.height - scaledY, Math.round(rect.height * scaleFactor));
 
   if (scaledW <= 0 || scaledH <= 0) {
-    throw new Error('Selection area is too small.');
+    throw new Error('Selection area is too small / Vùng chọn quá nhỏ.');
   }
 
   return image.crop({
@@ -96,6 +112,7 @@ async function startSnippet(onCaptured, onCancelled) {
     fullscreen: true,
     enableLargerThanScreen: true,
     hasShadow: false,
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, '../../preload.js'),
       contextIsolation: true,
@@ -114,28 +131,42 @@ async function startSnippet(onCaptured, onCancelled) {
     try {
       if (!rect || rect.width < 5 || rect.height < 5) {
         cleanup();
-        if (onCancelled) onCancelled('Selection too small');
+        if (onCancelled) onCancelled('Vùng chọn quá nhỏ');
         return;
       }
 
       let croppedImage = null;
       if (fullScreenshot && !fullScreenshot.isEmpty()) {
-        croppedImage = cropImage(fullScreenshot, rect, scaleFactor);
+        // Calculate true scale between natural screenshot pixels and display bounds
+        const imgSize = fullScreenshot.getSize();
+        const effectiveScaleX = imgSize.width / width;
+        const effectiveScaleY = imgSize.height / height;
+        const cropX = Math.round(rect.x * effectiveScaleX);
+        const cropY = Math.round(rect.y * effectiveScaleY);
+        const cropW = Math.round(rect.width * effectiveScaleX);
+        const cropH = Math.round(rect.height * effectiveScaleY);
+
+        croppedImage = fullScreenshot.crop({
+          x: cropX,
+          y: cropY,
+          width: Math.min(cropW, imgSize.width - cropX),
+          height: Math.min(cropH, imgSize.height - cropY)
+        });
       }
 
       cleanup();
 
-      if (croppedImage) {
+      if (croppedImage && !croppedImage.isEmpty()) {
         const buffer = croppedImage.toPNG();
         const dataUrl = croppedImage.toDataURL();
         if (onCaptured) {
           onCaptured({ buffer, dataUrl, rect });
         }
       } else {
-        if (onCancelled) onCancelled('Captured buffer empty');
+        if (onCancelled) onCancelled('Không thể cắt vùng ảnh đã chọn');
       }
     } catch (err) {
-      console.error('Failed processing crop:', err);
+      console.error('Lỗi khi cắt ảnh chụp:', err);
       cleanup();
       if (onCancelled) onCancelled(err.message);
     }
@@ -143,7 +174,7 @@ async function startSnippet(onCaptured, onCancelled) {
 
   ipcMain.once('overlay-cancel', () => {
     cleanup();
-    if (onCancelled) onCancelled('User cancelled screenshot');
+    if (onCancelled) onCancelled('Người dùng hủy thao tác chụp');
   });
 
   overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));

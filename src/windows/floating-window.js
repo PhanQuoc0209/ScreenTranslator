@@ -4,13 +4,57 @@ const path = require('path');
 let floatingWin = null;
 
 /**
+ * Calculate optimal window coordinates near the captured rectangle.
+ */
+function calculateOptimalPosition(targetCoords, winW, winH) {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
+
+  if (!targetCoords || typeof targetCoords.x !== 'number') {
+    return {
+      x: Math.round((screenW - winW) / 2),
+      y: Math.round((screenH - winH) / 2)
+    };
+  }
+
+  // Try placing to the right of selection
+  let posX = targetCoords.x + 12;
+  let posY = targetCoords.y;
+
+  // If overflowing right, place to the left of selection if rect bounds were provided
+  if (posX + winW > screenW - 12) {
+    if (typeof targetCoords.rectX === 'number' && targetCoords.rectX - winW - 12 > 10) {
+      posX = targetCoords.rectX - winW - 12;
+    } else {
+      posX = screenW - winW - 14;
+    }
+  }
+
+  // Ensure window is within horizontal bounds
+  posX = Math.max(10, Math.min(posX, screenW - winW - 10));
+
+  // Ensure window is within vertical bounds
+  if (posY + winH > screenH - 12) {
+    posY = Math.max(10, screenH - winH - 14);
+  }
+  posY = Math.max(10, posY);
+
+  return { x: posX, y: posY };
+}
+
+/**
  * Create or reuse the compact floating translator window.
  * @param {Object} [initialData] Optional initial data to send to the window.
- * @param {{ x?: number, y?: number }} [targetCoords] Optional coordinates near capture.
+ * @param {{ x?: number, y?: number, rectX?: number }} [targetCoords] Optional coordinates near capture.
  * @returns {BrowserWindow}
  */
 function showFloatingWindow(initialData = null, targetCoords = null) {
+  const winW = 470;
+  const winH = 540;
+  const pos = calculateOptimalPosition(targetCoords, winW, winH);
+
   if (floatingWin && !floatingWin.isDestroyed()) {
+    floatingWin.setPosition(pos.x, pos.y);
     floatingWin.show();
     floatingWin.focus();
     if (initialData) {
@@ -19,28 +63,13 @@ function showFloatingWindow(initialData = null, targetCoords = null) {
     return floatingWin;
   }
 
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenW, height: screenH } = primaryDisplay.workAreaSize;
-
-  const winW = 460;
-  const winH = 520;
-
-  // Position nicely on screen: near coordinates or near bottom-right
-  let posX = Math.round((screenW - winW) / 2);
-  let posY = Math.round((screenH - winH) / 2);
-
-  if (targetCoords && typeof targetCoords.x === 'number') {
-    posX = Math.min(Math.max(20, targetCoords.x), screenW - winW - 20);
-    posY = Math.min(Math.max(20, targetCoords.y), screenH - winH - 20);
-  }
-
   floatingWin = new BrowserWindow({
     width: winW,
     height: winH,
     minWidth: 380,
-    minHeight: 420,
-    x: posX,
-    y: posY,
+    minHeight: 440,
+    x: pos.x,
+    y: pos.y,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
